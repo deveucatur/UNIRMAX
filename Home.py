@@ -338,6 +338,10 @@ if 'can_optimize' not in st.session_state:
     st.session_state['can_optimize'] = False
 if 'NCoord' not in st.session_state:
     st.session_state['NCoord'] = 3
+if 'optimization_done' not in st.session_state:
+    st.session_state['optimization_done'] = False
+if 'results' not in st.session_state:
+    st.session_state['results'] = {}
 
 # Organizar a entrada de dados
 st.header("📍 Inserir Dados")
@@ -413,9 +417,11 @@ if st.button('🚀 Confirmar Dados'):
     if not error_flag:
         st.session_state['pontos'] = [origem] + Coordenadas
         st.session_state['can_optimize'] = True
+        st.session_state['optimization_done'] = False  # Resetar o estado de otimização
         st.success("✅ Dados inseridos com sucesso! Pronto para otimizar a rota.")
     else:
         st.session_state['can_optimize'] = False
+        st.session_state['optimization_done'] = False
         st.error("Corrija os erros acima para continuar.")
 
 # Botão para otimizar a rota
@@ -427,104 +433,131 @@ if st.session_state['can_optimize']:
             Mcusto = matrizDistancias(pontos)
 
             # Executar a otimização com Busca Tabu usando os parâmetros personalizados
-            MelhorResultado, listaRotas, listaCustos, custo_inicial = buscaTabu(0.3, Mcusto, iteracoes=iteracoes, tabu_tenure=tabu_tenure)
+            MelhorResultado, listaRotas, listaCustos, custo_inicial = buscaTabu(0.3, Mcusto, iteracoes=int(iteracoes), tabu_tenure=int(tabu_tenure))
             custo_total = MelhorResultado[0]
             ganho_otimizacao = custo_inicial - custo_total
             percentual_ganho = (ganho_otimizacao / custo_inicial) * 100
 
-            # Dashboard - Mostrar as métricas
-            st.header("📈 Dashboard de Resultados")
-
-            # Métricas estilizadas com HTML e CSS
-            st.markdown(f"""
-            <div class="metric-container">
-                <div class="metric initial-cost">
-                    <h3>Custo Inicial</h3>
-                    <p>{custo_inicial:.2f}</p>
-                </div>
-                <div class="metric optimized-cost">
-                    <h3>Custo Otimizado</h3>
-                    <p>{custo_total:.2f}</p>
-                </div>
-                <div class="metric gain">
-                    <h3>Ganho de Otimização</h3>
-                    <p>{percentual_ganho:.2f}%</p>
-                </div>
-            </div>
-            """, unsafe_allow_html=True)
-
-            # Organizar as plotagens em colunas
-            col1, col2 = st.columns(2)
-
-            with col1:
-                st.subheader("🛣️ Rota Otimizada")
-                # Criar o mapa interativo com Folium
-                m = folium.Map(location=[pontos[0][0], pontos[0][1]], zoom_start=12)
-                # Adicionar marcadores para os pontos
-                folium.Marker(location=[pontos[0][0], pontos[0][1]], popup='Origem', icon=folium.Icon(color='green')).add_to(m)
-                for idx, ponto in enumerate(pontos[1:], start=1):
-                    folium.Marker(location=[ponto[0], ponto[1]], popup=f'Ponto {idx}', icon=folium.Icon(color='red')).add_to(m)
-                # Adicionar a rota otimizada
-                solucao_coords = [[pontos[i][0], pontos[i][1]] for i in MelhorResultado[1]]
-                folium.PolyLine(solucao_coords, color='blue', weight=2.5, opacity=1).add_to(m)
-                st_data = st_folium(m, width=700, height=500)
-
-            with col2:
-                st.subheader("📊 Gráfico de Convergência")
-                # Filtrar apenas as iterações com melhoria
-                custos_melhoria = []
-                iteracoes_melhoria = []
-                melhor_custo = custo_inicial
-                for idx, custo in enumerate(listaCustos):
-                    if custo < melhor_custo:
-                        custos_melhoria.append(custo)
-                        iteracoes_melhoria.append(idx)
-                        melhor_custo = custo
-                # Gráfico de linha mostrando o custo em cada iteração de melhoria
-                fig2, ax2 = plt.subplots()
-                ax2.plot(iteracoes_melhoria, custos_melhoria, marker='o', linestyle='-')
-                ax2.set_xlabel('Iteração')
-                ax2.set_ylabel('Custo')
-                ax2.set_title('Custo por Iteração de Melhoria')
-                st.pyplot(fig2)
-
-            # Animação do processo de otimização
-            st.subheader("🎥 Animação do Processo de Otimização")
-            Rotas = listaRotas
-            custos = listaCustos
-            fig_anim, ax_anim = plt.subplots()
-            data = np.array(pontos)
-
-            # Filtrar apenas as iterações com melhoria
-            Rotas_melhoria = []
-            custos_melhoria_anim = []
-            melhor_custo = custo_inicial
-            for idx, (rota, custo) in enumerate(zip(Rotas, custos)):
-                if custo <= melhor_custo:
-                    Rotas_melhoria.append(rota)
-                    custos_melhoria_anim.append(custo)
-                    melhor_custo = custo
-
-            def animate(i):
-                ax_anim.clear()
-                rota = Rotas_melhoria[i]
-                custo_iteracao = custos_melhoria_anim[i]
-                sol = [pontos[j] for j in rota]
-                sol_array = np.array(sol)
-                ax_anim.plot(sol_array[:, 1], sol_array[:, 0], marker='o', c='b')
-                ax_anim.scatter(data[1:, 1], data[1:, 0], c="red")
-                ax_anim.scatter(data[0, 1], data[0, 0], c="green", marker="D", s=100)
-                ax_anim.set_xlabel('Longitude')
-                ax_anim.set_ylabel('Latitude')
-                ax_anim.set_title(f'Iteração {i+1} - Custo: {custo_iteracao:.2f}')
-
-            ani = animation.FuncAnimation(fig_anim, animate, frames=len(Rotas_melhoria), interval=1000, repeat=False)
-
-            # Salvar a animação como GIF
-            ani.save('otimizacao.gif', writer='pillow')
-
-            # Exibir o GIF
-            gif = open('otimizacao.gif', 'rb').read()
-            st.image(gif)
+            # Salvar os resultados no session_state
+            st.session_state['results'] = {
+                'MelhorResultado': MelhorResultado,
+                'listaRotas': listaRotas,
+                'listaCustos': listaCustos,
+                'custo_inicial': custo_inicial,
+                'custo_total': custo_total,
+                'ganho_otimizacao': ganho_otimizacao,
+                'percentual_ganho': percentual_ganho,
+                'iteracoes': iteracoes,
+                'tabu_tenure': tabu_tenure,
+                'pontos': pontos
+            }
+            st.session_state['optimization_done'] = True  # Indicar que a otimização foi concluída
 
             st.success('✅ Rota otimizada com sucesso!')
+
+# Exibir os resultados se a otimização foi concluída
+if st.session_state.get('optimization_done', False):
+    resultados = st.session_state['results']
+    MelhorResultado = resultados['MelhorResultado']
+    listaRotas = resultados['listaRotas']
+    listaCustos = resultados['listaCustos']
+    custo_inicial = resultados['custo_inicial']
+    custo_total = resultados['custo_total']
+    ganho_otimizacao = resultados['ganho_otimizacao']
+    percentual_ganho = resultados['percentual_ganho']
+    pontos = resultados['pontos']
+
+    # Dashboard - Mostrar as métricas
+    st.header("📈 Dashboard de Resultados")
+
+    # Métricas estilizadas com HTML e CSS
+    st.markdown(f"""
+    <div class="metric-container">
+        <div class="metric initial-cost">
+            <h3>Custo Inicial</h3>
+            <p>{custo_inicial:.2f}</p>
+        </div>
+        <div class="metric optimized-cost">
+            <h3>Custo Otimizado</h3>
+            <p>{custo_total:.2f}</p>
+        </div>
+        <div class="metric gain">
+            <h3>Ganho de Otimização</h3>
+            <p>{percentual_ganho:.2f}%</p>
+        </div>
+    </div>
+    """, unsafe_allow_html=True)
+
+    # Organizar as plotagens em colunas
+    col1, col2 = st.columns(2)
+
+    with col1:
+        st.subheader("🛣️ Rota Otimizada")
+        # Criar o mapa interativo com Folium
+        m = folium.Map(location=[pontos[0][0], pontos[0][1]], zoom_start=12)
+        # Adicionar marcadores para os pontos
+        folium.Marker(location=[pontos[0][0], pontos[0][1]], popup='Origem', icon=folium.Icon(color='green')).add_to(m)
+        for idx, ponto in enumerate(pontos[1:], start=1):
+            folium.Marker(location=[ponto[0], ponto[1]], popup=f'Ponto {idx}', icon=folium.Icon(color='red')).add_to(m)
+        # Adicionar a rota otimizada
+        solucao_coords = [[pontos[i][0], pontos[i][1]] for i in MelhorResultado[1]]
+        folium.PolyLine(solucao_coords, color='blue', weight=2.5, opacity=1).add_to(m)
+        st_data = st_folium(m, width=700, height=500)
+
+    with col2:
+        st.subheader("📊 Gráfico de Convergência")
+        # Filtrar apenas as iterações com melhoria
+        custos_melhoria = []
+        iteracoes_melhoria = []
+        melhor_custo = custo_inicial
+        for idx, custo in enumerate(listaCustos):
+            if custo < melhor_custo:
+                custos_melhoria.append(custo)
+                iteracoes_melhoria.append(idx)
+                melhor_custo = custo
+        # Gráfico de linha mostrando o custo em cada iteração de melhoria
+        fig2, ax2 = plt.subplots()
+        ax2.plot(iteracoes_melhoria, custos_melhoria, marker='o', linestyle='-')
+        ax2.set_xlabel('Iteração')
+        ax2.set_ylabel('Custo')
+        ax2.set_title('Custo por Iteração de Melhoria')
+        st.pyplot(fig2)
+
+    # Animação do processo de otimização
+    st.subheader("🎥 Animação do Processo de Otimização")
+    Rotas = listaRotas
+    custos = listaCustos
+    fig_anim, ax_anim = plt.subplots()
+    data = np.array(pontos)
+
+    # Filtrar apenas as iterações com melhoria
+    Rotas_melhoria = []
+    custos_melhoria_anim = []
+    melhor_custo = custo_inicial
+    for idx, (rota, custo) in enumerate(zip(Rotas, custos)):
+        if custo <= melhor_custo:
+            Rotas_melhoria.append(rota)
+            custos_melhoria_anim.append(custo)
+            melhor_custo = custo
+
+    def animate(i):
+        ax_anim.clear()
+        rota = Rotas_melhoria[i]
+        custo_iteracao = custos_melhoria_anim[i]
+        sol = [pontos[j] for j in rota]
+        sol_array = np.array(sol)
+        ax_anim.plot(sol_array[:, 1], sol_array[:, 0], marker='o', c='b')
+        ax_anim.scatter(data[1:, 1], data[1:, 0], c="red")
+        ax_anim.scatter(data[0, 1], data[0, 0], c="green", marker="D", s=100)
+        ax_anim.set_xlabel('Longitude')
+        ax_anim.set_ylabel('Latitude')
+        ax_anim.set_title(f'Iteração {i+1} - Custo: {custo_iteracao:.2f}')
+
+    ani = animation.FuncAnimation(fig_anim, animate, frames=len(Rotas_melhoria), interval=1000, repeat=False)
+
+    # Salvar a animação como GIF
+    ani.save('otimizacao.gif', writer='pillow')
+
+    # Exibir o GIF
+    gif = open('otimizacao.gif', 'rb').read()
+    st.image(gif)
