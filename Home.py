@@ -388,30 +388,50 @@ if st.session_state['can_optimize']:
             Mcusto = matrizDistancias(pontos)
 
             # Executar a otimização com Busca Tabu
-            R = buscaTabu(alpha, Mcusto)
+            R, listaRotas, listaCustos = buscaTabu(alpha, Mcusto)
+            custo_total = R[0]
 
-            # Plotar a rota otimizada
-            fig, ax = plt.subplots()
-            sol = [pontos[i] for i in R[0][1]]
-            data = np.array(pontos)
-            data2 = np.array(sol)
-            ax.plot(data2[:, 0], data2[:, 1], marker='o', c='b', label='Rota')
-            ax.scatter(data[1:, 0], data[1:, 1], c="red", label='Pontos de Entrega')
-            ax.scatter(data[0, 0], data[0, 1], c="green", marker="D", s=100, label='Origem')
-            ax.set_xlabel('Longitude')
-            ax.set_ylabel('Latitude')
-            ax.set_title('Rota Otimizada')
-            ax.legend()
-            st.pyplot(fig)
+            # Dashboard - Mostrar a rota otimizada e o custo
+            st.header("📈 Dashboard de Resultados")
+
+            col1, col2 = st.columns(2)
+
+            with col1:
+                st.subheader(f"🛣️ Rota Otimizada (Custo Total: {custo_total:.2f})")
+                fig, ax = plt.subplots()
+                sol = [pontos[i] for i in R[1]]
+                data = np.array(pontos)
+                data2 = np.array(sol)
+                ax.plot(data2[:, 0], data2[:, 1], marker='o', c='b', label='Rota')
+                ax.scatter(data[1:, 0], data[1:, 1], c="red", label='Pontos de Entrega')
+                ax.scatter(data[0, 0], data[0, 1], c="green", marker="D", s=100, label='Origem')
+                ax.set_xlabel('Longitude')
+                ax.set_ylabel('Latitude')
+                ax.set_title('Rota Otimizada')
+                ax.legend()
+                st.pyplot(fig)
+
+            with col2:
+                st.subheader("📊 Gráfico de Convergência")
+                # Gráfico de linha mostrando o custo em cada iteração
+                fig2, ax2 = plt.subplots()
+                ax2.plot(range(len(listaCustos)), listaCustos, marker='o', linestyle='-')
+                ax2.set_xlabel('Iteração')
+                ax2.set_ylabel('Custo')
+                ax2.set_title('Custo por Iteração')
+                st.pyplot(fig2)
 
             # Criar animação do processo de otimização
-            Rotas = R[1]
+            st.subheader("🎥 Animação do Processo de Otimização")
+            Rotas = listaRotas
+            custos = listaCustos
             fig_anim, ax_anim = plt.subplots()
             data = np.array(pontos)
 
             def animate(i):
                 ax_anim.clear()
                 rota = Rotas[i]
+                custo_iteracao = custos[i]
                 sol = [pontos[j] for j in rota]
                 sol_array = np.array(sol)
                 ax_anim.plot(sol_array[:, 0], sol_array[:, 1], marker='o', c='b')
@@ -419,7 +439,7 @@ if st.session_state['can_optimize']:
                 ax_anim.scatter(data[0, 0], data[0, 1], c="green", marker="D", s=100)
                 ax_anim.set_xlabel('Longitude')
                 ax_anim.set_ylabel('Latitude')
-                ax_anim.set_title('Iteração {}'.format(i+1))
+                ax_anim.set_title(f'Iteração {i+1} - Custo: {custo_iteracao:.2f}')
 
             ani = animation.FuncAnimation(fig_anim, animate, frames=len(Rotas), interval=1000, repeat=False)
 
@@ -427,7 +447,6 @@ if st.session_state['can_optimize']:
             ani.save('otimizacao.gif', writer='pillow')
 
             # Exibir o GIF
-            st.header("Animação do Processo de Otimização")
             gif = open('otimizacao.gif', 'rb').read()
             st.image(gif)
 
