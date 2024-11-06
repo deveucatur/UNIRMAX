@@ -157,51 +157,59 @@ def plotarGrafi(R,p):
     plt.scatter(data[:, 0], data[:, 1], c="r")
     plt.show()   
     
-def buscaTabu(alpha,Mcusto):
-    
-    MelhorResultado = (999999999999,[])
-    for rod in range(0,1): 
-        listaRotas = []
-        ## SOLUÇÃO INICIAL ALEATÓRIA ##
-        solução = graspContrutiva(alpha,Mcusto)
-        s = solução
+def buscaTabu(alpha, Mcusto):
+    MelhorResultado = (float('inf'), [])
+    listaCustos = []
+    listaRotas = []
+
+    # SOLUÇÃO INICIAL ALEATÓRIA
+    n = len(Mcusto)
+    s = list(range(n))
+    random.shuffle(s)
+    s = [0] + s + [0]
+    custo_s = calCusto(s, Mcusto)
+    MelhorResultado = (custo_s, s)
+    listaCustos.append(custo_s)
+    listaRotas.append(s)
+
+    # PARÂMETROS DA BUSCA TABU
+    iteracoes = 50
+    tabu_tenure = 5
+    listaTabu = []
+
+    for k in range(iteracoes):
+        # Geração de vizinhos (exemplo com swap)
+        vizinhos = []
+        for i in range(1, n - 1):
+            for j in range(i + 1, n):
+                vizinho = s[:]
+                vizinho[i], vizinho[j] = vizinho[j], vizinho[i]
+                movimento = (s[i], s[j])
+                custo_vizinho = calCusto(vizinho, Mcusto)
+                vizinhos.append((custo_vizinho, vizinho, movimento))
+
+        # Selecionar o melhor vizinho não tabu
+        vizinhos.sort()
+        for viz in vizinhos:
+            custo_vizinho, vizinho, movimento = viz
+            if movimento not in listaTabu:
+                s = vizinho
+                custo_s = custo_vizinho
+                listaTabu.append(movimento)
+                if len(listaTabu) > tabu_tenure:
+                    listaTabu.pop(0)
+                break
+
+        # Atualizar listas
+        listaCustos.append(custo_s)
         listaRotas.append(s)
-        print("s ",s)
-        ## BUSCA TABU ##
-        k = 0
-        melhorIter = k
-        BTmax = 4
-        
-        listaTabu = []
-        listaViz = []
-        listaVizOrd = listaDeVizinhança(s,listaViz)
-        s = listaVizOrd[0]
-        listaTabu.insert(0,listaVizOrd[0][1])
-        mS = s
-        while (k - melhorIter <= BTmax):
-            print(k,"-",melhorIter,"<=",BTmax)
-            k += 1
-            listaVizOrd = listaDeVizinhança(s[1],listaViz)
-            #print([x[0] for x in listaVizOrd][:5])
-            for j in listaVizOrd:
-                if j[1] not in listaTabu:
-                    #print(j)
-                    s = j
-                    listaTabu.insert(0,j[1])
-                    listaTabu = listaTabu[:5]
-                    break
-                else:
-                    pass
-            if s <= mS:
-                listaRotas.append(s[1])
-                mS = s
-                melhorIter = k
-            else:
-                pass
-        print(mS, melhorIter)
-        if mS[0] <= MelhorResultado[0]:
-            MelhorResultado = mS
-    return MelhorResultado,listaRotas
+
+        # Atualizar MelhorResultado
+        if custo_s < MelhorResultado[0]:
+            MelhorResultado = (custo_s, s)
+
+    return MelhorResultado, listaRotas, listaCustos
+
 
 
 
