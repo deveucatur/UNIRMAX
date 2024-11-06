@@ -88,8 +88,8 @@ def buscaTabu(alpha, Mcusto, iteracoes=50, tabu_tenure=5, num_vizinhos=100):
             movimento = (s[i], s[j])
             if movimento not in listaTabu:
                 custo_vizinho = calCusto(vizinho, Mcusto)
-                if custo_vizinho < melhor_custo:
-                    # Aplicar 2-opt somente se o custo for menor
+                # Aplicar 2-opt a cada 5 iterações
+                if k % 5 == 0:
                     vizinho_otimizado = dois_opt(vizinho, Mcusto)
                     custo_vizinho = calCusto(vizinho_otimizado, Mcusto)
                     vizinhos.append((custo_vizinho, vizinho_otimizado, movimento))
@@ -363,21 +363,12 @@ if st.session_state.get('optimization_done', False):
 
     with col2:
         st.subheader("📊 Gráfico de Convergência")
-        # Filtrar apenas as iterações com melhoria
-        custos_melhoria = []
-        iteracoes_melhoria = []
-        melhor_custo = custo_inicial
-        for idx, custo in enumerate(listaCustos):
-            if custo < melhor_custo:
-                custos_melhoria.append(custo)
-                iteracoes_melhoria.append(idx)
-                melhor_custo = custo
-        # Gráfico de linha mostrando o custo em cada iteração de melhoria
+        # Gráfico de linha mostrando o custo em cada iteração
         fig2, ax2 = plt.subplots()
-        ax2.plot(iteracoes_melhoria, custos_melhoria, marker='o', linestyle='-')
+        ax2.plot(range(len(listaCustos)), listaCustos, marker='o', linestyle='-')
         ax2.set_xlabel('Iteração')
         ax2.set_ylabel('Custo')
-        ax2.set_title('Custo por Iteração de Melhoria')
+        ax2.set_title('Custo por Iteração')
         st.pyplot(fig2)
 
     # Animação do processo de otimização
@@ -386,41 +377,26 @@ if st.session_state.get('optimization_done', False):
     custos = listaCustos
     data = np.array(pontos)
 
-    # Filtrar apenas as iterações com melhoria
-    Rotas_melhoria = []
-    custos_melhoria_anim = []
-    melhor_custo = custo_inicial
-    for idx, (rota, custo) in enumerate(zip(Rotas, custos)):
-        if custo <= melhor_custo:
-            Rotas_melhoria.append(rota)
-            custos_melhoria_anim.append(custo)
-            melhor_custo = custo
+    fig_anim, ax_anim = plt.subplots()
 
-    # Criar a animação apenas se houver melhorias
-    if Rotas_melhoria:
-        fig_anim, ax_anim = plt.subplots()
+    def animate(i):
+        ax_anim.clear()
+        rota = Rotas[i]
+        custo_iteracao = custos[i]
+        sol = [pontos[j] for j in rota]
+        sol_array = np.array(sol)
+        ax_anim.plot(sol_array[:, 1], sol_array[:, 0], marker='o', c='b')
+        ax_anim.scatter(data[1:, 1], data[1:, 0], c="red")
+        ax_anim.scatter(data[0, 1], data[0, 0], c="green", marker="D", s=100)
+        ax_anim.set_xlabel('Longitude')
+        ax_anim.set_ylabel('Latitude')
+        ax_anim.set_title(f'Iteração {i+1} - Custo: {custo_iteracao:.2f}')
 
-        def animate(i):
-            ax_anim.clear()
-            rota = Rotas_melhoria[i]
-            custo_iteracao = custos_melhoria_anim[i]
-            sol = [pontos[j] for j in rota]
-            sol_array = np.array(sol)
-            ax_anim.plot(sol_array[:, 1], sol_array[:, 0], marker='o', c='b')
-            ax_anim.scatter(data[1:, 1], data[1:, 0], c="red")
-            ax_anim.scatter(data[0, 1], data[0, 0], c="green", marker="D", s=100)
-            ax_anim.set_xlabel('Longitude')
-            ax_anim.set_ylabel('Latitude')
-            ax_anim.set_title(f'Iteração {i+1} - Custo: {custo_iteracao:.2f}')
+    ani = animation.FuncAnimation(fig_anim, animate, frames=len(Rotas), interval=500, repeat=False)
 
-        ani = animation.FuncAnimation(fig_anim, animate, frames=len(Rotas_melhoria), interval=1000, repeat=False)
+    # Salvar a animação como GIF
+    ani.save('otimizacao.gif', writer='pillow')
 
-        # Salvar a animação como GIF
-        ani.save('otimizacao.gif', writer='pillow')
-
-        # Exibir o GIF
-        gif = open('otimizacao.gif', 'rb').read()
-        st.image(gif)
-    else:
-        st.write("Nenhuma melhoria encontrada para criar a animação.")
-
+    # Exibir o GIF
+    gif = open('otimizacao.gif', 'rb').read()
+    st.image(gif)
