@@ -7,6 +7,8 @@ import copy
 import itertools
 from io import BytesIO
 from PIL import Image
+import folium
+from streamlit_folium import st_folium
 
 # Funções auxiliares de otimização
 def euclideanDistances(x1, y1, x2, y2):
