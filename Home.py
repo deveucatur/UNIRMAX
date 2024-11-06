@@ -157,28 +157,30 @@ def plotarGrafi(R,p):
     plt.scatter(data[:, 0], data[:, 1], c="r")
     plt.show()   
     
+# Implementação da buscaTabu com registro de custos apenas em melhorias
 def buscaTabu(alpha, Mcusto):
     MelhorResultado = (float('inf'), [])
     listaCustos = []
     listaRotas = []
+    listaIteracoes = []
 
-    # SOLUÇÃO INICIAL ALEATÓRIA
+    # Gerar uma solução inicial usando GRASP
     n = len(Mcusto)
-    s = list(range(n))
-    random.shuffle(s)
-    s = [0] + s + [0]
+    s = graspContrutiva(alpha, Mcusto)
     custo_s = calCusto(s, Mcusto)
+    custo_inicial = custo_s  # Armazenar o custo inicial
     MelhorResultado = (custo_s, s)
     listaCustos.append(custo_s)
     listaRotas.append(s)
+    listaIteracoes.append(0)
 
     # PARÂMETROS DA BUSCA TABU
     iteracoes = 50
     tabu_tenure = 5
     listaTabu = []
 
-    for k in range(iteracoes):
-        # Geração de vizinhos (exemplo com swap)
+    for k in range(1, iteracoes + 1):
+        # Gerar vizinhos usando movimentos Swap
         vizinhos = []
         for i in range(1, n - 1):
             for j in range(i + 1, n):
@@ -190,6 +192,7 @@ def buscaTabu(alpha, Mcusto):
 
         # Selecionar o melhor vizinho não tabu
         vizinhos.sort()
+        encontrou_vizinho = False
         for viz in vizinhos:
             custo_vizinho, vizinho, movimento = viz
             if movimento not in listaTabu:
@@ -198,17 +201,20 @@ def buscaTabu(alpha, Mcusto):
                 listaTabu.append(movimento)
                 if len(listaTabu) > tabu_tenure:
                     listaTabu.pop(0)
+                encontrou_vizinho = True
                 break
 
-        # Atualizar listas
-        listaCustos.append(custo_s)
-        listaRotas.append(s)
+        if not encontrou_vizinho:
+            break  # Se não encontrou vizinho não tabu, encerra a busca
 
-        # Atualizar MelhorResultado
+        # Atualizar MelhorResultado se houver melhoria
         if custo_s < MelhorResultado[0]:
             MelhorResultado = (custo_s, s)
+            listaCustos.append(custo_s)
+            listaRotas.append(s)
+            listaIteracoes.append(k)
 
-    return MelhorResultado, listaRotas, listaCustos
+    return MelhorResultado, listaRotas, listaCustos, custo_inicial, listaIteracoes
 
 
 
@@ -301,6 +307,15 @@ st.markdown("""
         padding: 20px;
         border-radius: 10px;
         margin-bottom: 20px;
+    }
+    /* Métricas */
+    .metric-container {
+        display: flex;
+        justify-content: space-around;
+        margin-bottom: 20px;
+    }
+    .metric {
+        text-align: center;
     }
     </style>
     """, unsafe_allow_html=True)
@@ -437,6 +452,7 @@ if st.session_state['can_optimize']:
             st.subheader("🎥 Animação do Processo de Otimização")
             Rotas = listaRotas
             custos = listaCustos
+            iteracoes = listaIteracoes
             fig_anim, ax_anim = plt.subplots()
             data = np.array(pontos)
 
