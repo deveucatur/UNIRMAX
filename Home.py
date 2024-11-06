@@ -281,7 +281,7 @@ st.markdown("""
         border-radius: 10px;
     }
     /* Inputs */
-    .stTextInput>div>div>input {
+    .stTextInput>div>div>input, .stNumberInput>div>div>input {
         border: 1px solid #ced4da;
         border-radius: 5px;
     }
@@ -308,12 +308,20 @@ st.markdown("""
     }
     .metric h3 {
         margin: 5px 0;
-        color: #28a745;
     }
     .metric p {
         margin: 0;
         font-size: 24px;
         font-weight: bold;
+    }
+    .metric.initial-cost h3 {
+        color: #ff4d4d;  /* Vermelho claro */
+    }
+    .metric.optimized-cost h3 {
+        color: #66cc66;  /* Verde claro */
+    }
+    .metric.gain h3 {
+        color: #4da6ff;  /* Azul claro */
     }
     </style>
     """, unsafe_allow_html=True)
@@ -354,6 +362,14 @@ for i in range(int(NCoord)):
         help="Copie e cole as coordenadas do Google Maps no formato indicado."
     )
     Coordenadas_input.append(coord_input)
+
+# Parâmetros personalizáveis
+st.header("⚙️ Parâmetros do Algoritmo")
+col_param1, col_param2 = st.columns(2)
+with col_param1:
+    iteracoes = st.number_input("Número de Iterações", min_value=10, max_value=1000, value=50, step=10)
+with col_param2:
+    tabu_tenure = st.number_input("Tamanho da Lista Tabu", min_value=1, max_value=100, value=5, step=1)
 
 # Botão para confirmar os dados
 if st.button('🚀 Confirmar Dados'):
@@ -405,8 +421,8 @@ if st.session_state['can_optimize']:
             # Gerar a matriz de custos
             Mcusto = matrizDistancias(pontos)
 
-            # Executar a otimização com Busca Tabu
-            MelhorResultado, listaRotas, listaCustos, custo_inicial = buscaTabu(0.3, Mcusto)
+            # Executar a otimização com Busca Tabu usando os parâmetros personalizados
+            MelhorResultado, listaRotas, listaCustos, custo_inicial = buscaTabu(0.3, Mcusto, iteracoes=iteracoes, tabu_tenure=tabu_tenure)
             custo_total = MelhorResultado[0]
             ganho_otimizacao = custo_inicial - custo_total
             percentual_ganho = (ganho_otimizacao / custo_inicial) * 100
@@ -417,15 +433,15 @@ if st.session_state['can_optimize']:
             # Métricas estilizadas com HTML e CSS
             st.markdown(f"""
             <div class="metric-container">
-                <div class="metric">
+                <div class="metric initial-cost">
                     <h3>Custo Inicial</h3>
                     <p>{custo_inicial:.2f}</p>
                 </div>
-                <div class="metric">
+                <div class="metric optimized-cost">
                     <h3>Custo Otimizado</h3>
                     <p>{custo_total:.2f}</p>
                 </div>
-                <div class="metric">
+                <div class="metric gain">
                     <h3>Ganho de Otimização</h3>
                     <p>{percentual_ganho:.2f}%</p>
                 </div>
@@ -437,19 +453,16 @@ if st.session_state['can_optimize']:
 
             with col1:
                 st.subheader("🛣️ Rota Otimizada")
-                fig, ax = plt.subplots()
-                sol = [pontos[i] for i in MelhorResultado[1]]
-                data = np.array(pontos)
-                data2 = np.array(sol)
-                # Inverter as coordenadas para plotar longitude (x) e latitude (y)
-                ax.plot(data2[:, 1], data2[:, 0], marker='o', c='b', label='Rota')
-                ax.scatter(data[1:, 1], data[1:, 0], c="red", label='Pontos de Entrega')
-                ax.scatter(data[0, 1], data[0, 0], c="green", marker="D", s=100, label='Origem')
-                ax.set_xlabel('Longitude')
-                ax.set_ylabel('Latitude')
-                ax.set_title(f'Rota Otimizada (Custo: {custo_total:.2f})')
-                ax.legend()
-                st.pyplot(fig)
+                # Criar o mapa interativo com Folium
+                m = folium.Map(location=[pontos[0][0], pontos[0][1]], zoom_start=12)
+                # Adicionar marcadores para os pontos
+                folium.Marker(location=[pontos[0][0], pontos[0][1]], popup='Origem', icon=folium.Icon(color='green')).add_to(m)
+                for idx, ponto in enumerate(pontos[1:], start=1):
+                    folium.Marker(location=[ponto[0], ponto[1]], popup=f'Ponto {idx}', icon=folium.Icon(color='red')).add_to(m)
+                # Adicionar a rota otimizada
+                solucao_coords = [[pontos[i][0], pontos[i][1]] for i in MelhorResultado[1]]
+                folium.PolyLine(solucao_coords, color='blue', weight=2.5, opacity=1).add_to(m)
+                st_data = st_folium(m, width=700, height=500)
 
             with col2:
                 st.subheader("📊 Gráfico de Convergência")
@@ -477,10 +490,20 @@ if st.session_state['can_optimize']:
             fig_anim, ax_anim = plt.subplots()
             data = np.array(pontos)
 
+            # Filtrar apenas as iterações com melhoria
+            Rotas_melhoria = []
+            custos_melhoria_anim = []
+            melhor_custo = custo_inicial
+            for idx, (rota, custo) in enumerate(zip(Rotas, custos)):
+                if custo <= melhor_custo:
+                    Rotas_melhoria.append(rota)
+                    custos_melhoria_anim.append(custo)
+                    melhor_custo = custo
+
             def animate(i):
                 ax_anim.clear()
-                rota = Rotas[i]
-                custo_iteracao = custos[i]
+                rota = Rotas_melhoria[i]
+                custo_iteracao = custos_melhoria_anim[i]
                 sol = [pontos[j] for j in rota]
                 sol_array = np.array(sol)
                 ax_anim.plot(sol_array[:, 1], sol_array[:, 0], marker='o', c='b')
@@ -489,7 +512,8 @@ if st.session_state['can_optimize']:
                 ax_anim.set_xlabel('Longitude')
                 ax_anim.set_ylabel('Latitude')
                 ax_anim.set_title(f'Iteração {i+1} - Custo: {custo_iteracao:.2f}')
-            ani = animation.FuncAnimation(fig_anim, animate, frames=len(Rotas), interval=1000, repeat=False)
+
+            ani = animation.FuncAnimation(fig_anim, animate, frames=len(Rotas_melhoria), interval=1000, repeat=False)
 
             # Salvar a animação como GIF
             ani.save('otimizacao.gif', writer='pillow')
