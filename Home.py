@@ -553,7 +553,7 @@ if st.session_state.get('optimization_done', False):
         ax_anim.set_ylabel('Latitude')
         ax_anim.set_title(f'Iteração {i+1} - Custo: {custo_iteracao:.2f}')
 
-    ani = animation.FuncAnimation(fig_anim, animate, frames=len(Rotas_melhoria), interval=150, repeat=False)
+    ani = animation.FuncAnimation(fig_anim, animate, frames=len(Rotas_melhoria), interval=200, repeat=False)
 
     # Salvar a animação como GIF
     ani.save('otimizacao.gif', writer='pillow')
