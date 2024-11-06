@@ -162,59 +162,43 @@ def buscaTabu(alpha, Mcusto):
     MelhorResultado = (float('inf'), [])
     listaCustos = []
     listaRotas = []
-    listaIteracoes = []
-
-    # Gerar uma solução inicial usando GRASP
+    # Solução inicial aleatória
     n = len(Mcusto)
-    s = graspContrutiva(alpha, Mcusto)
+    s = list(range(1, n))
+    random.shuffle(s)
+    s = [0] + s + [0]
     custo_s = calCusto(s, Mcusto)
-    custo_inicial = custo_s  # Armazenar o custo inicial
     MelhorResultado = (custo_s, s)
+    custo_inicial = custo_s
     listaCustos.append(custo_s)
     listaRotas.append(s)
-    listaIteracoes.append(0)
-
-    # PARÂMETROS DA BUSCA TABU
-    iteracoes = 50
     tabu_tenure = 5
     listaTabu = []
+    iteracoes = 50
 
-    for k in range(1, iteracoes + 1):
-        # Gerar vizinhos usando movimentos Swap
+    for k in range(iteracoes):
         vizinhos = []
         for i in range(1, n - 1):
             for j in range(i + 1, n):
                 vizinho = s[:]
                 vizinho[i], vizinho[j] = vizinho[j], vizinho[i]
                 movimento = (s[i], s[j])
-                custo_vizinho = calCusto(vizinho, Mcusto)
-                vizinhos.append((custo_vizinho, vizinho, movimento))
-
-        # Selecionar o melhor vizinho não tabu
+                if movimento not in listaTabu:
+                    custo_vizinho = calCusto(vizinho, Mcusto)
+                    vizinhos.append((custo_vizinho, vizinho, movimento))
+        if not vizinhos:
+            break
         vizinhos.sort()
-        encontrou_vizinho = False
-        for viz in vizinhos:
-            custo_vizinho, vizinho, movimento = viz
-            if movimento not in listaTabu:
-                s = vizinho
-                custo_s = custo_vizinho
-                listaTabu.append(movimento)
-                if len(listaTabu) > tabu_tenure:
-                    listaTabu.pop(0)
-                encontrou_vizinho = True
-                break
-
-        if not encontrou_vizinho:
-            break  # Se não encontrou vizinho não tabu, encerra a busca
-
-        # Atualizar MelhorResultado se houver melhoria
+        custo_s, s, movimento = vizinhos[0]
+        listaTabu.append(movimento)
+        if len(listaTabu) > tabu_tenure:
+            listaTabu.pop(0)
+        listaCustos.append(custo_s)
+        listaRotas.append(s)
         if custo_s < MelhorResultado[0]:
             MelhorResultado = (custo_s, s)
-            listaCustos.append(custo_s)
-            listaRotas.append(s)
-            listaIteracoes.append(k)
 
-    return MelhorResultado, listaRotas, listaCustos, custo_inicial, listaIteracoes
+    return MelhorResultado, listaRotas, listaCustos, custo_inicial
 
 
 
