@@ -157,8 +157,8 @@ def plotarGrafi(R,p):
     plt.scatter(data[:, 0], data[:, 1], c="r")
     plt.show()   
     
-# Implementação da buscaTabu com registro de custos apenas em melhorias
-def buscaTabu(alpha, Mcusto):
+# Implementação da Busca Tabu com parâmetros personalizáveis
+def buscaTabu(alpha, Mcusto, iteracoes=50, tabu_tenure=5):
     MelhorResultado = (float('inf'), [])
     listaCustos = []
     listaRotas = []
@@ -172,9 +172,10 @@ def buscaTabu(alpha, Mcusto):
     custo_inicial = custo_s
     listaCustos.append(custo_s)
     listaRotas.append(s)
-    tabu_tenure = 5
     listaTabu = []
-    iteracoes = 50
+
+    melhor_custo = custo_s
+    melhor_solucao = s
 
     for k in range(iteracoes):
         vizinhos = []
@@ -197,6 +198,8 @@ def buscaTabu(alpha, Mcusto):
         listaRotas.append(s)
         if custo_s < MelhorResultado[0]:
             MelhorResultado = (custo_s, s)
+            melhor_custo = custo_s
+            melhor_solucao = s
 
     return MelhorResultado, listaRotas, listaCustos, custo_inicial
 
