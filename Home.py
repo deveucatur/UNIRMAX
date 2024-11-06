@@ -64,6 +64,8 @@ def buscaTabu(alpha, Mcusto, iteracoes=50, tabu_tenure=5, num_vizinhos=100):
     s = list(range(1, n))
     random.shuffle(s)
     s = [0] + s + [0]
+    # Aplicar 2-opt na solução inicial
+    s = dois_opt(s, Mcusto)
     custo_s = calCusto(s, Mcusto)
     MelhorResultado = (custo_s, s)
     custo_inicial = custo_s
@@ -88,13 +90,11 @@ def buscaTabu(alpha, Mcusto, iteracoes=50, tabu_tenure=5, num_vizinhos=100):
             movimento = (s[i], s[j])
             if movimento not in listaTabu:
                 custo_vizinho = calCusto(vizinho, Mcusto)
-                # Aplicar 2-opt a cada 5 iterações
-                if k % 5 == 0:
-                    vizinho_otimizado = dois_opt(vizinho, Mcusto)
-                    custo_vizinho = calCusto(vizinho_otimizado, Mcusto)
-                    vizinhos.append((custo_vizinho, vizinho_otimizado, movimento))
-                else:
-                    vizinhos.append((custo_vizinho, vizinho, movimento))
+                # Aplicar 2-opt se o custo melhorar
+                if custo_vizinho < melhor_custo:
+                    vizinho = dois_opt(vizinho, Mcusto)
+                    custo_vizinho = calCusto(vizinho, Mcusto)
+                vizinhos.append((custo_vizinho, vizinho, movimento))
         if not vizinhos:
             break
         vizinhos.sort()
@@ -102,12 +102,13 @@ def buscaTabu(alpha, Mcusto, iteracoes=50, tabu_tenure=5, num_vizinhos=100):
         listaTabu.append(movimento)
         if len(listaTabu) > tabu_tenure:
             listaTabu.pop(0)
-        listaCustos.append(custo_s)
-        listaRotas.append(s)
-        if custo_s < MelhorResultado[0]:
-            MelhorResultado = (custo_s, s)
+        # Registrar apenas se houver melhoria
+        if custo_s < melhor_custo:
+            listaCustos.append(custo_s)
+            listaRotas.append(s)
             melhor_custo = custo_s
             melhor_solucao = s
+            MelhorResultado = (custo_s, s)
 
     return MelhorResultado, listaRotas, listaCustos, custo_inicial
 
@@ -363,12 +364,13 @@ if st.session_state.get('optimization_done', False):
 
     with col2:
         st.subheader("📊 Gráfico de Convergência")
-        # Gráfico de linha mostrando o custo em cada iteração
+        # Gráfico de linha mostrando o custo em cada iteração de melhoria
+        iteracoes_melhoria = list(range(len(listaCustos)))
         fig2, ax2 = plt.subplots()
-        ax2.plot(range(len(listaCustos)), listaCustos, marker='o', linestyle='-')
+        ax2.plot(iteracoes_melhoria, listaCustos, marker='o', linestyle='-')
         ax2.set_xlabel('Iteração')
         ax2.set_ylabel('Custo')
-        ax2.set_title('Custo por Iteração')
+        ax2.set_title('Custo por Iteração de Melhoria')
         st.pyplot(fig2)
 
     # Animação do processo de otimização
@@ -377,26 +379,29 @@ if st.session_state.get('optimization_done', False):
     custos = listaCustos
     data = np.array(pontos)
 
-    fig_anim, ax_anim = plt.subplots()
+    if Rotas:
+        fig_anim, ax_anim = plt.subplots()
 
-    def animate(i):
-        ax_anim.clear()
-        rota = Rotas[i]
-        custo_iteracao = custos[i]
-        sol = [pontos[j] for j in rota]
-        sol_array = np.array(sol)
-        ax_anim.plot(sol_array[:, 1], sol_array[:, 0], marker='o', c='b')
-        ax_anim.scatter(data[1:, 1], data[1:, 0], c="red")
-        ax_anim.scatter(data[0, 1], data[0, 0], c="green", marker="D", s=100)
-        ax_anim.set_xlabel('Longitude')
-        ax_anim.set_ylabel('Latitude')
-        ax_anim.set_title(f'Iteração {i+1} - Custo: {custo_iteracao:.2f}')
+        def animate(i):
+            ax_anim.clear()
+            rota = Rotas[i]
+            custo_iteracao = custos[i]
+            sol = [pontos[j] for j in rota]
+            sol_array = np.array(sol)
+            ax_anim.plot(sol_array[:, 1], sol_array[:, 0], marker='o', c='b')
+            ax_anim.scatter(data[1:, 1], data[1:, 0], c="red")
+            ax_anim.scatter(data[0, 1], data[0, 0], c="green", marker="D", s=100)
+            ax_anim.set_xlabel('Longitude')
+            ax_anim.set_ylabel('Latitude')
+            ax_anim.set_title(f'Iteração {i+1} - Custo: {custo_iteracao:.2f}')
 
-    ani = animation.FuncAnimation(fig_anim, animate, frames=len(Rotas), interval=500, repeat=False)
+        ani = animation.FuncAnimation(fig_anim, animate, frames=len(Rotas), interval=1000, repeat=False)
 
-    # Salvar a animação como GIF
-    ani.save('otimizacao.gif', writer='pillow')
+        # Salvar a animação como GIF
+        ani.save('otimizacao.gif', writer='pillow')
 
-    # Exibir o GIF
-    gif = open('otimizacao.gif', 'rb').read()
-    st.image(gif)
+        # Exibir o GIF
+        gif = open('otimizacao.gif', 'rb').read()
+        st.image(gif)
+    else:
+        st.write("Nenhuma melhoria encontrada para criar a animação.")
