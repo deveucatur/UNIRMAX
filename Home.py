@@ -25,7 +25,7 @@ def matrizDistancias(coord):
     custo = distMatrix
     return custo
 
-def calCusto(solucao):
+def calCusto(solucao, Mcusto):
     dist = 0
     for i in range(len(solucao) - 1):
         dist += float(Mcusto[solucao[i]][solucao[i + 1]])
